@@ -34,6 +34,11 @@ def crawler_details(uri):
     return crawler(url)
 
 
+def crawler_evaluated(page=1):
+    url = f"https://www.reclameaqui.com.br/empresa/prefeitura-fortaleza/lista-reclamacoes/?pagina={page}&status=EVALUATED"    
+    return crawler(url)
+
+
 def crawler(url):
     headers = {
         'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36' 
@@ -58,6 +63,22 @@ def extract_urls(soup):
 
     return urls
 
+
+def extract_evaluated(soup):
+    urls = []
+    if soup is not None:      
+        divs = soup.find_all('div', class_='sc-1pe7b5t-0')
+        for div in divs:
+            link = div.find('a')
+            uri = link['href']
+            status = False
+            span = div.find('span', class_='sc-1pe7b5t-4')
+            if span is not None:
+                status = False if "não" in span.text else True
+
+            urls.append({'uri': uri, 'status': status})
+
+    return urls
 
 def latest_complaints():
     soup = crawler_page(1)
@@ -142,6 +163,24 @@ def extract_details():
     df.to_csv(csv_file, index=False, sep=';')
     
 
+def evaluated():
+    soup = crawler_evaluated(1)
+    evaluateds = extract_evaluated(soup)
+    pages = total_pages(soup)
+    print('pages:', pages)
+    if pages > 1:
+        for page in range(2, pages):
+            soup = crawler_evaluated(page)
+            evaluateds += extract_evaluated(soup)
+
+    df = pd.read_csv(csv_file, sep=';')
+    for one in evaluateds:
+        idx = df.index[df['uri'] == one['uri']]
+        df.loc[idx, 'evaluated'] = one['status']
+
+    df.to_csv(csv_file, index=False, sep=';')
+
+
 default_args = {
     'owner': 'Antonie_Lima',
     'depends_on_past': False,
@@ -158,6 +197,7 @@ dag = DAG(
     schedule_interval=timedelta(days=1),
 )
 
+
 # Defina a tarefa de scraping
 latest_complaints_task = PythonOperator(
     task_id='latest_complaints',
@@ -171,6 +211,12 @@ extract_details_task = PythonOperator(
     dag=dag
 )
 
+evaluated_task = PythonOperator(
+    task_id='evaluated',
+    python_callable=evaluated,
+    dag=dag
+)
+
 # Defina as dependências
-latest_complaints_task >> extract_details_task
+latest_complaints_task >> extract_details_task >> evaluated_task
 
