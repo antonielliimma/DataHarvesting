@@ -34,7 +34,7 @@ def crawler_details(uri):
     return crawler(url)
 
 
-def crawler_evaluated(page=1):
+def crawler_answered(page=1):
     url = f"https://www.reclameaqui.com.br/empresa/prefeitura-fortaleza/lista-reclamacoes/?pagina={page}&status=EVALUATED"    
     return crawler(url)
 
@@ -64,7 +64,7 @@ def extract_urls(soup):
     return urls
 
 
-def extract_evaluated(soup):
+def extract_answered(soup):
     urls = []
     if soup is not None:      
         divs = soup.find_all('div', class_='sc-1pe7b5t-0')
@@ -101,8 +101,7 @@ def latest_complaints():
                     'description': '',
                     'created_at': '',
                     'city': '',
-                    'answered': False,
-                    'evaluated': False
+                    'answered': False
                 }
                 df = df.append(new_row, ignore_index=True)
 
@@ -116,8 +115,7 @@ def latest_complaints():
                 'description': '',
                 'created_at': '',
                 'city': '',
-                'answered': False,
-                'evaluated': False
+                'answered': False
             })
         df = pd.DataFrame(data)        
 
@@ -163,19 +161,19 @@ def extract_details():
     df.to_csv(csv_file, index=False, sep=';')
     
 
-def evaluated():
-    soup = crawler_evaluated(1)
-    evaluateds = extract_evaluated(soup)
+def answered():
+    soup = crawler_answered(1)
+    answereds = extract_answered(soup)
     pages = total_pages(soup)
     if pages > 1:
         for page in range(2, pages):
-            soup = crawler_evaluated(page)
-            evaluateds += extract_evaluated(soup)
+            soup = crawler_answered(page)
+            answereds += extract_answered(soup)
 
     df = pd.read_csv(csv_file, sep=';')
-    for one in evaluateds:
+    for one in answereds:
         idx = df.index[df['uri'] == one['uri']]
-        df.loc[idx, 'evaluated'] = one['status']
+        df.loc[idx, 'answered'] = one['status']
 
     df.to_csv(csv_file, index=False, sep=';')
 
@@ -210,12 +208,11 @@ extract_details_task = PythonOperator(
     dag=dag
 )
 
-evaluated_task = PythonOperator(
-    task_id='evaluated',
-    python_callable=evaluated,
+answered_task = PythonOperator(
+    task_id='answered',
+    python_callable=answered,
     dag=dag
 )
 
 # Defina as dependências
-latest_complaints_task >> extract_details_task >> evaluated_task
-
+latest_complaints_task >> extract_details_task >> answered_task
