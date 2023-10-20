@@ -167,7 +167,6 @@ def evaluated():
     soup = crawler_evaluated(1)
     evaluateds = extract_evaluated(soup)
     pages = total_pages(soup)
-    print('pages:', pages)
     if pages > 1:
         for page in range(2, pages):
             soup = crawler_evaluated(page)
